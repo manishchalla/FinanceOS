@@ -1,101 +1,217 @@
-# FinanceOS - Personal Finance Platform
+<div align="center">
 
-A full-stack personal finance app built with Next.js 14, Drizzle ORM, SQLite (better-sqlite3), and NextAuth v5.
+# FinanceOS
 
-## Tech Stack
-| Layer | Tool |
-|---|---|
-| Framework | Next.js 14 (App Router) |
-| Database | SQLite via **better-sqlite3** (local .db file) |
-| ORM | Drizzle ORM |
-| Auth | NextAuth.js v5 (JWT, credentials) |
-| Styling | Tailwind CSS + Radix UI primitives |
-| Charts | Recharts |
-| Forms | React Hook Form + Zod |
-| Data fetching | TanStack Query |
+
+
+<!-- Add your demo GIF here after recording -->
+<!-- ![FinanceOS Demo](public/demo.gif) -->
+
+**[Features](#-features) · [Use Cases](#-use-cases) · [Impact](#-impact) · [Getting Started](#-getting-started) · [AI Features](#-ai-features) · [Tech Stack](#-tech-stack)**
+
+</div>
 
 ---
 
-## Setup (Windows - Git Bash, CMD, or PowerShell)
+##  What is FinanceOS?
 
-### 1. Install dependencies
+FinanceOS is a full-stack personal finance platform you run on your own machine. No subscriptions, no cloud fees, no data leaving your computer. Track income and expenses, set budgets, import bank statements, and get AI-powered insights all from a single dashboard.
+
+---
+
+##  Use Cases
+
+| Who | How they use it |
+|-----|----------------|
+| **Students** | Track monthly spending vs budget, visualise where money goes each month |
+| **Freelancers** | Separate income streams, monitor cash flow across multiple accounts |
+| **Families** | Shared expense tracking with per-category budgets (groceries, utilities, etc.) |
+| **Developers** | Portfolio project showcasing full-stack skills with real-world production patterns |
+| **Finance enthusiasts** | Self-hosted alternative to Mint/YNAB with complete data ownership |
+| **Small businesses** | Track business expenses and income across accounts with CSV bank import |
+
+---
+
+##  Impact
+
+- **Zero running cost** — SQLite file-based DB, no cloud services, runs on any laptop
+- **Privacy first** — financial data stored locally, never sent to third-party servers
+- **AI that actually works** — Groq's Llama 3.3 analyses real transaction data , gives specific dollar-amount insights
+- **Instant setup** — from `git clone` to running dashboard in under 5 minutes
+- **Production patterns** — built with the same tools used at real companies (Next.js App Router, Drizzle ORM, NextAuth v5, TanStack Query)
+
+---
+
+##  Features
+
+###  Dashboard
+- KPI cards — Total Balance, Monthly Income, Monthly Expenses, Net Savings
+- Area chart — Income vs Expenses over last 6 months (auto-adjusts to your actual data dates)
+- Pie chart — Spending breakdown by category for the active month
+- Recent transactions — last 8 with category icons and correct +/− signs
+
+###  Accounts
+- Multiple account types — checking, savings, credit, investment, cash
+- Color-coded cards with balance display
+- Balance auto-updates on every transaction add/edit/delete
+
+###  Transactions
+- Add income, expenses, and transfers
+- Edit any transaction — balance corrects automatically
+- Delete with balance reversal
+- Live search by description or category
+- Date filters — This month, Last month, Last 3 months, This year, All time, Custom range
+- Summary bar showing total income, expenses and net for the filtered period
+
+###  CSV Import
+- Drag-and-drop or click-to-browse
+- Auto-detects date, description, amount, and type columns
+- Smart type detection — positive = income, negative = expense, or reads a Type column
+- Handles Excel BOM, Windows line endings, MM/DD/YYYY and DD/MM/YYYY formats
+- 4-step wizard: Upload → Map columns → Preview → Import
+- Batch inserts up to 500 rows with automatic balance update
+
+###  Budgets
+- Create budgets per category or across all expenses
+- Live progress bars — green → yellow → red as you approach limit
+- Shows remaining amount or overage in real time
+
+###  Categories
+- 12 default categories auto-seeded on register
+- Custom categories with emoji icons and color pickers
+- Income, expense, or both types
+
+###  AI Assistant
+- **Financial Health Score** — scores 0–100 with breakdown across 4 dimensions, all calculated in code
+- **Finance Chat** — ask questions like "What was my income in December?" and get answers with exact figures from your real data
+- **Anomaly Radar** — detects duplicate charges, spending spikes (2x above average), and large one-off purchases using code-based detection before AI summarises
+---
+
+
+## 🚦 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Git
+- Windows (Git Bash / CMD / PowerShell) or Mac/Linux
+
+### Installation
+
 ```bash
+# 1. Clone
+git clone https://github.com/yourusername/finance-platform.git
+cd finance-platform
+
+# 2. Install dependencies
 npm install
 ```
-> Note: `better-sqlite3` compiles a native Node.js addon.
-> If you get a build error, install windows build tools first:
-> `npm install --global windows-build-tools` or install Visual Studio Build Tools.
 
-### 2. Configure your environment
-Open `.env.local` and replace the `AUTH_SECRET` value:
+> **Windows note:** `better-sqlite3` compiles a native addon. If install fails:
+> ```bash
+> npm install --global windows-build-tools
+> ```
+> Or install "Desktop development with C++" from Visual Studio Installer.
+
+### Environment Setup
+
+```bash
+cp .env.local.example .env.local
+```
+
+Open `.env.local` and fill in:
+
+```env
+DATABASE_URL="finance.db"
+AUTH_SECRET="your-random-secret"
+NEXTAUTH_SECRET="your-random-secret"
+NEXTAUTH_URL="http://localhost:3000"
+GROQ_API_KEY="gsk_your_key_here"
+```
+
+Generate secrets:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
-Paste the output as your `AUTH_SECRET`.
 
-### 3. Create the database
+Get a free Groq API key at **https://console.groq.com** → API Keys → Create (14,400 requests/day free).
+
+### Run
+
 ```bash
+# Create the database
 npm run db:push
-```
-This creates `finance.db` in your project root automatically.
 
-### 4. Start the dev server
-```bash
+# Start dev server
 npm run dev
 ```
-Visit **http://localhost:3000** — register an account and you're in!
 
-### 5. (Optional) Browse the database visually
+Visit **http://localhost:3000**
+
+### Useful Commands
+
 ```bash
-npm run db:studio
+npm run dev          # Development server
+npm run build        # Production build
+npm run db:push      # Sync schema to SQLite
+npm run db:studio    # Visual database browser
 ```
 
 ---
 
-## Project Structure
+## 🤖 AI Features
+
+All AI features use **Groq's free tier** — Llama 3.3
+
+### How it works (correctly)
+
+The key design principle: **code does all the math, AI only writes the text.**
+
+Most AI finance apps ask the LLM to calculate totals — this causes hallucinations. FinanceOS pre-computes everything in TypeScript first:
+
 ```
-src/
-├── app/
-│   ├── (auth)/           # Login + Register pages (public)
-│   ├── (dashboard)/      # Protected pages
-│   │   ├── dashboard/    # Overview with charts
-│   │   ├── accounts/     # Manage bank accounts
-│   │   ├── transactions/ # Income & expenses log
-│   │   ├── budgets/      # Budget tracking with progress bars
-│   │   └── categories/   # Transaction categories
-│   ├── api/              # REST API routes
-│   ├── layout.tsx        # Root layout
-│   └── providers.tsx     # Session + Query providers
-├── auth.ts               # NextAuth full config (Node.js only)
-├── auth.config.ts        # NextAuth edge-safe config (middleware)
-├── middleware.ts          # Route protection (Edge Runtime safe)
-├── db/
-│   ├── index.ts          # better-sqlite3 + Drizzle client
-│   └── schema.ts         # Tables: users, accounts, categories, transactions, budgets
-├── components/
-│   ├── layout/           # Sidebar + TopBar
-│   └── ui/               # Radix-based components
-└── lib/utils.ts          # Helpers: cn(), formatCurrency()
+Code calculates → monthly totals, averages, anomaly detection
+↓
+Sends pre-computed facts to Groq
+↓
+Groq writes human-readable insights about those facts
+```
+
+This means answers like "Your December 2025 income was $7,950" are always exactly correct.
+
+### Health Score Calculation
+
+| Metric | Formula |
+|--------|---------|
+| Savings Rate | `(avg_income - avg_expense) / avg_income × 100` |
+| Score | 40%+ savings → 90, 30-40% → 75, 20-30% → 60, etc. |
+| All scores | Computed in TypeScript, LLM cannot override them |
+
+### Anomaly Detection (code-based)
+
+Three detection passes run in TypeScript before any AI call:
+1. **Duplicates** — same description + amount appearing 2+ times in a month
+2. **Spikes** — current month amount ÷ historical average ≥ 2.0
+3. **Large one-offs** — amount ≥ $300 with no historical data
+
+If no anomalies are detected, the AI is bypassed entirely. Zero false positives.
+
+
+## 🤝 Contributing
+
+```bash
+git checkout -b feature/your-feature
+git commit -m "feat: description"
+git push origin feature/your-feature
 ```
 
 ---
 
-## Troubleshooting
+## 📄 License
 
-**`better-sqlite3` install fails on Windows**
-Install build tools (run as Administrator):
-```bash
-npm install --global windows-build-tools
-```
-Or install "Desktop development with C++" from Visual Studio Installer.
+MIT © [Manish Challa](https://github.com/manishchalla)
 
-**`npm run db:push` fails**
-Make sure `.env.local` exists with `DATABASE_URL="finance.db"`.
+---
 
-**Auth not working / redirect loops**
-Make sure `AUTH_SECRET` in `.env.local` is set to a long random string.
-
-**Port already in use**
-```bash
-npm run dev -- -p 3001
-```
+<div align="center">
+  <p>Built with ❤️ · <a href="https://github.com/yourusername/finance-platform">⭐ Star on GitHub</a></p>
+</div>

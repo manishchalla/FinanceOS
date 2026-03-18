@@ -176,7 +176,6 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
         date: detectCol(hdrs, ["date","time","posted","transaction date"]),
         description: detectCol(hdrs, ["description","memo","details","narration","particulars","name"]),
         amount: detectCol(hdrs, ["amount","debit","credit","sum","value"]),
-        typeCol: detectCol(hdrs, ["type","transaction type","dr/cr"]),
       });
       setStep("map");
     };
