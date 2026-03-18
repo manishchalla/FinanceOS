@@ -1,6 +1,7 @@
 
 "use client";
 import { useState, useRef, useEffect } from "react";
+import AgentChat from "./agent-chat";
 import { Brain, MessageSquare, AlertTriangle, Zap, Send, Loader2, TrendingUp, RefreshCw } from "lucide-react";
 
 type HealthScore = {
@@ -200,59 +201,7 @@ export default function AIPage() {
         </div>
       )}
 
-      {tab === "chat" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col" style={{ height: "560px" }}>
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center py-8">
-                <MessageSquare className="h-10 w-10 text-purple-400/30 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm mb-1">Ask anything about your finances</p>
-                <p className="text-slate-600 text-xs mb-6">AI has access to your real transaction data</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {SUGGESTED.map(q => (
-                    <button key={q} onClick={() => sendChat(q)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-purple-500/10 hover:text-purple-400 border border-slate-700 hover:border-purple-500/30 rounded-full text-xs text-slate-400 transition-all">
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "bg-purple-500 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700"}`}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-sm px-4 py-3">
-                  <div className="flex gap-1.5 items-center">
-                    <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="p-4 border-t border-slate-800">
-            <div className="flex gap-2">
-              <input value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(input); } }}
-                placeholder="Ask about your spending, savings, budget..."
-                className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-              />
-              <button onClick={() => sendChat(input)} disabled={!input.trim() || chatLoading}
-                className="p-2.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl transition-all">
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {tab === "chat" && <AgentChat />}
 
       {tab === "anomalies" && (
         <div className="space-y-4">

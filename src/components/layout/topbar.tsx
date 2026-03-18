@@ -5,7 +5,7 @@ import type { User } from "next-auth";
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard", "/transactions": "Transactions",
-  "/accounts": "Accounts", "/budgets": "Budgets", "/categories": "Categories", "/ai": "AI Assistant",
+  "/accounts": "Accounts", "/budgets": "Budgets", "/categories": "Categories", "/ai": "AI Assistant", "/agent": "AI Agent Chat",
 };
 
 export function TopBar({ user }: { user: User }) {

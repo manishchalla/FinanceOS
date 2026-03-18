@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Search, Upload, X, Check, Pencil, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Search, Upload, X, Check, Pencil, ChevronDown, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -163,6 +163,8 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
   const [importing, setImporting] = useState(false);
   const [count, setCount] = useState(0);
   const [importError, setImportError] = useState("");
+  const [categorizing, setCategorizing] = useState(false);
+  const [categorizedCount, setCategorizedCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function load(file: File) {
@@ -230,6 +232,14 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
         return;
       }
       setCount(json.imported ?? 0); setImporting(false); setStep("done");
+      // Auto-categorize after import
+      setCategorizing(true);
+      try {
+        const catRes = await fetch("/api/ai/auto-categorize", { method: "POST" });
+        const catJson = await catRes.json();
+        setCategorizedCount(catJson.categorized ?? 0);
+      } catch {}
+      setCategorizing(false);
     } catch (e) {
       setImportError("Network error — please try again");
       setImporting(false);
@@ -356,8 +366,23 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
                 <Check className="h-8 w-8 text-emerald-400" />
               </div>
               <h3 className="text-white text-xl font-semibold mb-2">Import complete!</h3>
-              <p className="text-slate-400 mb-6">{count} transactions imported successfully.</p>
-              <button onClick={() => { onImported(); onClose(); }} className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold">Done</button>
+              <p className="text-slate-400 mb-2">{count} transactions imported.</p>
+              {categorizing ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-purple-400 mb-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  AI is categorizing your transactions...
+                </div>
+              ) : categorizedCount > 0 ? (
+                <p className="text-emerald-400 text-sm mb-4">
+                  AI automatically categorized {categorizedCount} transaction types
+                </p>
+              ) : (
+                <p className="text-slate-500 text-sm mb-4">Categories assigned manually or via AI agent</p>
+              )}
+              <button onClick={() => { onImported(); onClose(); }} disabled={categorizing}
+                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">
+                {categorizing ? "Please wait..." : "Done"}
+              </button>
             </div>
           )}
         </div>
@@ -537,7 +562,7 @@ export default function TransactionsPage() {
             </div>
             {filtered.map((tx: Tx, i: number) => (
               <div key={tx.id} className={`flex items-center gap-3 px-5 py-3.5 ${i!==0?"border-t border-slate-800":""} hover:bg-slate-800/40 group transition-colors`}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{backgroundColor:`${tx.catColor??"#6366f1"}20`}}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{backgroundColor:`${tx.catColor??"#64748b"}20`}}>
                   {tx.catIcon ?? "📦"}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -546,7 +571,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="w-28 text-right hidden sm:block">
                   <div className="flex items-center justify-end gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{backgroundColor: tx.accountColor??"#6366f1"}}/>
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{backgroundColor: tx.accountColor??"#64748b"}}/>
                     <span className="text-xs text-slate-400 truncate">{tx.accountName}</span>
                   </div>
                 </div>

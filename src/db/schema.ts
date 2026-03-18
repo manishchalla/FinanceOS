@@ -62,3 +62,28 @@ export type Account = typeof accounts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
+
+// ─── AI Memory ────────────────────────────────────────────────────────────────
+export const aiMemory = sqliteTable("ai_memory", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+}, (t) => ({
+  userKeyIdx: index("ai_memory_user_key_idx").on(t.userId, t.key),
+}));
+
+// ─── Chat History ─────────────────────────────────────────────────────────────
+export const chatHistory = sqliteTable("chat_history", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["user", "assistant"] }).notNull(),
+  content: text("content").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`),
+}, (t) => ({
+  userIdx: index("chat_history_user_idx").on(t.userId),
+}));
+
+export type AiMemory = typeof aiMemory.$inferSelect;
+export type ChatHistory = typeof chatHistory.$inferSelect;
