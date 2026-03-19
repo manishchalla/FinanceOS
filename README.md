@@ -4,7 +4,8 @@
 
 **Self-hosted personal finance platform with multi-agent AI**
 
-//video
+https://github.com/user-attachments/assets/41e29ee5-b9e7-4227-810f-03fa848693a9
+
 
 </div>
 
