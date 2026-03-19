@@ -1,0 +1,94 @@
+Date,Description,Amount,Type
+2025-10-01,Monthly Salary,5000,income
+2025-10-02,House Rent,-1200,expense
+2025-10-03,Electricity Bill,-95,expense
+2025-10-04,Grocery Store,-210,expense
+2025-10-06,Uber Eats,-38,expense
+2025-10-08,Netflix,-16,expense
+2025-10-10,Gym Membership,-50,expense
+2025-10-12,Amazon Purchase,-89,expense
+2025-10-14,Petrol,-60,expense
+2025-10-16,Coffee Shop,-22,expense
+2025-10-18,Freelance Project,800,income
+2025-10-20,Phone Bill,-45,expense
+2025-10-22,Dining Out,-65,expense
+2025-10-25,Clothes Shopping,-120,expense
+2025-10-28,Uber Cab,-18,expense
+2025-11-01,Monthly Salary,5000,income
+2025-11-02,House Rent,-1200,expense
+2025-11-03,Electricity Bill,-110,expense
+2025-11-04,Grocery Store,-195,expense
+2025-11-06,Swiggy Order,-42,expense
+2025-11-08,Netflix,-16,expense
+2025-11-09,Spotify,-10,expense
+2025-11-10,Gym Membership,-50,expense
+2025-11-12,Online Course,-199,expense
+2025-11-14,Petrol,-55,expense
+2025-11-15,Freelance Project,1200,income
+2025-11-18,Phone Bill,-45,expense
+2025-11-20,Doctor Visit,-80,expense
+2025-11-22,Dining Out,-55,expense
+2025-11-26,Black Friday Shopping,-340,expense
+2025-11-28,Uber Cab,-25,expense
+2025-12-01,Monthly Salary,5000,income
+2025-12-01,Year End Bonus,2000,income
+2025-12-02,House Rent,-1200,expense
+2025-12-03,Electricity Bill,-130,expense
+2025-12-05,Grocery Store,-280,expense
+2025-12-07,Zomato,-55,expense
+2025-12-08,Netflix,-16,expense
+2025-12-10,Gym Membership,-50,expense
+2025-12-12,Christmas Gifts,-450,expense
+2025-12-14,Petrol,-70,expense
+2025-12-15,Freelance Project,950,income
+2025-12-18,Phone Bill,-45,expense
+2025-12-20,Flight Tickets,-380,expense
+2025-12-22,Holiday Dining,-145,expense
+2025-12-24,Hotel Stay,-220,expense
+2025-12-28,New Year Party,-95,expense
+2026-01-01,Monthly Salary,5000,income
+2026-01-02,House Rent,-1200,expense
+2026-01-03,Electricity Bill,-105,expense
+2026-01-05,Grocery Store,-220,expense
+2026-01-07,Uber Eats,-35,expense
+2026-01-08,Netflix,-16,expense
+2026-01-10,Gym Membership,-50,expense
+2026-01-12,Amazon Purchase,-145,expense
+2026-01-14,Petrol,-58,expense
+2026-01-15,Freelance Project,1500,income
+2026-01-18,Phone Bill,-45,expense
+2026-01-20,Dining Out,-72,expense
+2026-01-22,iPhone Purchase,-999,expense
+2026-01-25,Coffee Shop,-18,expense
+2026-01-28,Netflix,-16,expense
+2026-01-29,Medical Bill,-180,expense
+2026-02-01,Monthly Salary,5000,income
+2026-02-02,House Rent,-1200,expense
+2026-02-03,Electricity Bill,-98,expense
+2026-02-05,Grocery Store,-205,expense
+2026-02-07,Swiggy Order,-40,expense
+2026-02-08,Netflix,-16,expense
+2026-02-10,Gym Membership,-50,expense
+2026-02-12,Valentines Dinner,-120,expense
+2026-02-14,Petrol,-62,expense
+2026-02-15,Freelance Project,1100,income
+2026-02-18,Phone Bill,-45,expense
+2026-02-20,Online Course,-89,expense
+2026-02-22,Dining Out,-58,expense
+2026-02-25,Amazon Purchase,-75,expense
+2026-02-27,Uber Cab,-22,expense
+2026-03-01,Monthly Salary,5000,income
+2026-03-02,House Rent,-1200,expense
+2026-03-03,Electricity Bill,-88,expense
+2026-03-05,Grocery Store,-198,expense
+2026-03-07,Uber Eats,-44,expense
+2026-03-08,Netflix,-16,expense
+2026-03-10,Gym Membership,-50,expense
+2026-03-12,Team Lunch Expense,-320,expense
+2026-03-14,Petrol,-65,expense
+2026-03-15,Freelance Project,2000,income
+2026-03-18,Phone Bill,-45,expense
+2026-03-20,Dining Out,-68,expense
+2026-03-22,Amazon Purchase,-110,expense
+2026-03-25,Coffee Shop,-20,expense
+2026-03-28,Uber Cab,-28,expense

@@ -72,7 +72,9 @@ export function DashboardClient({ data }: Props) {
                 <XAxis dataKey="month" stroke="#475569" tick={{ fill: "#94a3b8", fontSize: 12 }} />
                 <YAxis stroke="#475569" tick={{ fill: "#94a3b8", fontSize: 11 }} tickFormatter={v => `$${v}`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }}
+                  contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9" }}
+                  labelStyle={{ color: "#f1f5f9", fontWeight: 500, marginBottom: 4 }}
+                  itemStyle={{ color: "#cbd5e1" }}
                   formatter={(v: number) => [formatCurrency(v)]}
                 />
                 <Area type="monotone" dataKey="income"   stroke="#10b981" fill="url(#ig)" strokeWidth={2} name="Income" />
@@ -99,8 +101,10 @@ export function DashboardClient({ data }: Props) {
                     {data.catSpend.map((c, i) => <Cell key={i} fill={c.color ?? "#6366f1"} />)}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }}
-                    formatter={(v: number) => [formatCurrency(v)]}
+                    contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9" }}
+                    labelStyle={{ color: "#f1f5f9", fontWeight: 500 }}
+                    itemStyle={{ color: "#cbd5e1" }}
+                    formatter={(v: number, name: string) => [formatCurrency(v), name ?? "Amount"]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -133,7 +137,7 @@ export function DashboardClient({ data }: Props) {
             <div key={tx.id} className={`flex items-center justify-between py-2.5 ${i !== 0 ? "border-t border-slate-800" : ""}`}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                  style={{ backgroundColor: `${tx.catColor ?? "#6366f1"}20` }}>
+                  style={{ backgroundColor: `${tx.catColor ?? "#64748b"}20` }}>
                   {tx.catIcon ?? "📦"}
                 </div>
                 <div>

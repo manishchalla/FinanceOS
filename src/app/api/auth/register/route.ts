@@ -12,7 +12,7 @@ async function seedCategories(userId: string) {
     { name: "Freelance", icon: "💻", color: "#3b82f6", type: "income" as const },
     { name: "Investment", icon: "📈", color: "#8b5cf6", type: "income" as const },
     { name: "Food & Dining", icon: "🍔", color: "#f97316", type: "expense" as const },
-    { name: "Transport", icon: "🚗", color: "#6366f1", type: "expense" as const },
+    { name: "Transport", icon: "🚗", color: "#0284c7", type: "expense" as const },
     { name: "Shopping", icon: "🛍️", color: "#ec4899", type: "expense" as const },
     { name: "Housing", icon: "🏠", color: "#14b8a6", type: "expense" as const },
     { name: "Health", icon: "⚕️", color: "#ef4444", type: "expense" as const },
