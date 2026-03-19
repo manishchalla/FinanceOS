@@ -40,3 +40,6 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+#MD
+INTERVIEW.md
