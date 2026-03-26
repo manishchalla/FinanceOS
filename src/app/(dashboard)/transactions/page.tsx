@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
+import { useSearchParams } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 
 type Tx = {
@@ -392,9 +393,16 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
 }
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const initialType = searchParams.get("type");
+  const initialTypeFilter =
+    initialType === "income" || initialType === "expense" || initialType === "all"
+      ? initialType
+      : "all";
+
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter);
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [datePreset, setDatePreset] = useState(4);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -593,7 +601,7 @@ export default function TransactionsPage() {
             ))}
             <div className="px-5 py-2.5 border-t border-slate-800 bg-slate-800/20 flex justify-between">
               <span className="text-xs text-slate-500">{filtered.length} transaction{filtered.length !== 1 ? "s" : ""}</span>
-              {search && <span className="text-xs text-slate-500">filtered by "{search}"</span>}
+              {search && <span className="text-xs text-slate-500">filtered by &quot;{search}&quot;</span>}
             </div>
           </>
         )}

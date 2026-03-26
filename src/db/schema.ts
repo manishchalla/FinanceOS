@@ -6,6 +6,8 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  // When enabled, the LLM receives anonymized transaction descriptions only.
+  privacyMode: integer("privacy_mode").notNull().default(0),
   createdAt: text("created_at").default(sql`(datetime('now'))`),
 });
 
@@ -46,6 +48,19 @@ export const transactions = sqliteTable("transactions", {
   dateIdx: index("transactions_date_idx").on(t.date),
 }));
 
+// ─── Anomaly feedback (Phase 2) ─────────────────────────────────────────────
+export const anomalyFeedback = sqliteTable("anomaly_feedback", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  transactionId: text("transaction_id")
+    .notNull()
+    .references(() => transactions.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  userVerdict: text("user_verdict").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`),
+}, (t) => ({
+  txIdx: index("anomaly_feedback_tx_idx").on(t.transactionId),
+}));
+
 export const budgets = sqliteTable("budgets", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -61,6 +76,7 @@ export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
+export type AnomalyFeedback = typeof anomalyFeedback.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
 
 // ─── AI Memory ────────────────────────────────────────────────────────────────

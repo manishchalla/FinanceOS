@@ -176,6 +176,8 @@ function CSVImport({ accounts, categories, onClose, onImported }: {
         date: detectCol(hdrs, ["date","time","posted","transaction date"]),
         description: detectCol(hdrs, ["description","memo","details","narration","particulars","name"]),
         amount: detectCol(hdrs, ["amount","debit","credit","sum","value"]),
+        // Some CSVs include an explicit income/expense column; if not found we'll fall back to sign-based auto-detection.
+        typeCol: detectCol(hdrs, ["type","transaction type","category type","income expense","debit credit"]),
       });
       setStep("map");
     };

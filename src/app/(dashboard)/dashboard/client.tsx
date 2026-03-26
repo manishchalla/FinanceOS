@@ -1,6 +1,12 @@
 "use client";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { InsightCard } from "@/components/insight-card";
+import { NetWorthChart } from "@/components/net-worth-chart";
+import { SubscriptionsCard } from "@/components/subscriptions-card";
+import { AnomalyAlertCard } from "@/components/anomaly-alert-card";
+import { computeMonthStatus, getTrendVsAverage } from "@/lib/insights";
+import type { RecurringSubscription } from "@/lib/subscriptions";
 import { formatCurrency } from "@/lib/utils";
 
 type Props = {
@@ -13,20 +19,68 @@ type Props = {
     accounts: { id: string; name: string; type: string; balance: number; color: string }[];
     recent: { id: string; description: string; amount: number; type: string; date: string; catName: string | null; catIcon: string | null; catColor: string | null }[];
     chartData: { month: string; income: number; expenses: number }[];
+    netWorthChartData: { month: string; netWorth: number }[];
+    cashRunway: { monthsRemaining: number; status: "green" | "amber" | "red"; insight: string };
+    recurringSubscriptions: RecurringSubscription[];
     catSpend: { name: string | null; icon: string | null; color: string | null; total: number }[];
   };
 };
 
 export function DashboardClient({ data }: Props) {
-  const stats = [
-    { label: "Total Balance",    value: data.totalBalance,    icon: Wallet,      color: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/20",    sub: "across all accounts" },
-    { label: "Income",           value: data.monthlyIncome,   icon: TrendingUp,  color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", sub: data.activeMonthLabel },
-    { label: "Expenses",         value: data.monthlyExpenses, icon: TrendingDown,color: "text-red-400",     bg: "bg-red-500/10",     border: "border-red-500/20",     sub: data.activeMonthLabel },
-    { label: "Net Savings",      value: data.netSavings,      icon: PiggyBank,
-      color: data.netSavings >= 0 ? "text-emerald-400" : "text-red-400",
-      bg:    data.netSavings >= 0 ? "bg-emerald-500/10" : "bg-red-500/10",
-      border:data.netSavings >= 0 ? "border-emerald-500/20" : "border-red-500/20",
-      sub: data.activeMonthLabel },
+  const avg = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
+
+  const cashRunwayStyles: Record<"green" | "amber" | "red", { color: string; bg: string; border: string }> = {
+    green: { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+    amber: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+    red: { color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+  };
+
+  const incomeHistory = data.chartData.map(d => d.income);
+  const expenseHistory = data.chartData.map(d => d.expenses);
+  const netSavingsHistory = data.chartData.map(d => d.income - d.expenses);
+
+  // `chartData` is 6 months ending at the active month. Use the first 5 months as baseline.
+  const incomeAvg = avg(incomeHistory.slice(0, 5));
+  const expenseAvg = avg(expenseHistory.slice(0, 5));
+  const netSavingsAvg = avg(netSavingsHistory.slice(0, 5));
+
+  const incomeTrend = getTrendVsAverage(data.monthlyIncome, incomeAvg);
+  const expensesTrend = getTrendVsAverage(data.monthlyExpenses, expenseAvg);
+  const netSavingsTrend = getTrendVsAverage(data.netSavings, netSavingsAvg);
+
+  const incomeStatus = computeMonthStatus(incomeTrend.pct, { isGoodWhenHigher: true });
+  const expensesStatus = computeMonthStatus(expensesTrend.pct, { isGoodWhenHigher: false });
+  const netSavingsStatus = computeMonthStatus(netSavingsTrend.pct, { isGoodWhenHigher: true });
+
+  const insightCards = [
+    {
+      label: "Total Balance",
+      value: data.totalBalance,
+      trend: netSavingsTrend.trend,
+      status: netSavingsStatus,
+      insight: netSavingsTrend.insight.replace("average", "average cashflow"),
+    },
+    {
+      label: "Income",
+      value: data.monthlyIncome,
+      trend: incomeTrend.trend,
+      status: incomeStatus,
+      insight: incomeTrend.insight,
+    },
+    {
+      label: "Expenses",
+      value: data.monthlyExpenses,
+      trend: expensesTrend.trend,
+      status: expensesStatus,
+      insight: expensesTrend.insight,
+    },
+    {
+      label: "Net Savings",
+      value: data.netSavings,
+      trend: netSavingsTrend.trend,
+      status: netSavingsStatus,
+      insight: netSavingsTrend.insight,
+    },
   ];
 
   const hasChartData = data.chartData.some(d => d.income > 0 || d.expenses > 0);
@@ -35,17 +89,15 @@ export function DashboardClient({ data }: Props) {
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map(s => (
-          <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-slate-400">{s.label}</p>
-              <div className={`p-2 rounded-lg ${s.bg} border ${s.border}`}>
-                <s.icon className={`h-4 w-4 ${s.color}`} />
-              </div>
-            </div>
-            <p className={`text-2xl font-bold ${s.color}`}>{formatCurrency(s.value)}</p>
-            <p className="text-xs text-slate-500 mt-1">{s.sub}</p>
-          </div>
+        {insightCards.map(card => (
+          <InsightCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            trend={card.trend}
+            status={card.status}
+            insight={card.insight}
+          />
         ))}
       </div>
 
@@ -87,6 +139,8 @@ export function DashboardClient({ data }: Props) {
               No transaction data for this period
             </div>
           )}
+
+          <NetWorthChart data={data.netWorthChartData} />
         </div>
 
         {/* Pie Chart */}
@@ -123,6 +177,23 @@ export function DashboardClient({ data }: Props) {
           ) : (
             <div className="flex items-center justify-center h-40 text-slate-500 text-sm">No expense data</div>
           )}
+        </div>
+
+        {/* Cash Runway */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h3 className="text-white font-semibold mb-3">Cash Runway</h3>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-slate-400">Months remaining</p>
+            <div className={`px-2 py-1 text-xs rounded-lg ${cashRunwayStyles[data.cashRunway.status].bg} border ${cashRunwayStyles[data.cashRunway.status].border}`}>
+              {data.cashRunway.status.toUpperCase()}
+            </div>
+          </div>
+          <p className={`text-2xl font-bold ${cashRunwayStyles[data.cashRunway.status].color}`}>
+            {Number.isFinite(data.cashRunway.monthsRemaining)
+              ? Math.max(0, Math.round(data.cashRunway.monthsRemaining * 10) / 10).toString()
+              : "∞"}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">{data.cashRunway.insight}</p>
         </div>
       </div>
 
@@ -177,6 +248,11 @@ export function DashboardClient({ data }: Props) {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <SubscriptionsCard items={data.recurringSubscriptions} />
+        <AnomalyAlertCard />
       </div>
     </div>
   );
