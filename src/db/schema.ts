@@ -6,8 +6,11 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  // When enabled, the LLM receives anonymized transaction descriptions only.
   privacyMode: integer("privacy_mode").notNull().default(0),
+  // Nullable so existing users aren't broken on db:push
+  userArchetype: text("user_archetype", {
+    enum: ["credit_rebuilder", "cash_surfer", "wealth_builder", "debt_destroyer"],
+  }),
   createdAt: text("created_at").default(sql`(datetime('now'))`),
 });
 
@@ -16,6 +19,8 @@ export const accounts = sqliteTable("accounts", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   type: text("type", { enum: ["checking","savings","credit","investment","cash"] }).notNull().default("checking"),
+  // Nullable default so existing accounts aren't broken
+  accountPurpose: text("account_purpose", { enum: ["personal","business","investment","joint"] }).default("personal"),
   balance: real("balance").notNull().default(0),
   currency: text("currency").notNull().default("USD"),
   color: text("color").notNull().default("#6366f1"),
@@ -48,9 +53,10 @@ export const transactions = sqliteTable("transactions", {
   dateIdx: index("transactions_date_idx").on(t.date),
 }));
 
-// ─── Anomaly feedback (Phase 2) ─────────────────────────────────────────────
 export const anomalyFeedback = sqliteTable("anomaly_feedback", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  // Nullable so existing rows (without userId) don't fail on migration
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   transactionId: text("transaction_id")
     .notNull()
     .references(() => transactions.id, { onDelete: "cascade" }),
@@ -59,6 +65,7 @@ export const anomalyFeedback = sqliteTable("anomaly_feedback", {
   createdAt: text("created_at").default(sql`(datetime('now'))`),
 }, (t) => ({
   txIdx: index("anomaly_feedback_tx_idx").on(t.transactionId),
+  userIdx: index("anomaly_feedback_user_idx").on(t.userId),
 }));
 
 export const budgets = sqliteTable("budgets", {
@@ -72,14 +79,17 @@ export const budgets = sqliteTable("budgets", {
   createdAt: text("created_at").default(sql`(datetime('now'))`),
 }, (t) => ({ userIdx: index("budgets_user_idx").on(t.userId) }));
 
-export type User = typeof users.$inferSelect;
-export type Account = typeof accounts.$inferSelect;
-export type Category = typeof categories.$inferSelect;
-export type Transaction = typeof transactions.$inferSelect;
-export type AnomalyFeedback = typeof anomalyFeedback.$inferSelect;
-export type Budget = typeof budgets.$inferSelect;
+export const decisions = sqliteTable("decisions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  recommendation: text("recommendation").notNull(),
+  reasoningJson: text("reasoning_json"),
+  outcomeNotes: text("outcome_notes"),
+  outcomeCheckedAt: text("outcome_checked_at"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`),
+}, (t) => ({ userIdx: index("decisions_user_idx").on(t.userId) }));
 
-// ─── AI Memory ────────────────────────────────────────────────────────────────
 export const aiMemory = sqliteTable("ai_memory", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -90,7 +100,6 @@ export const aiMemory = sqliteTable("ai_memory", {
   userKeyIdx: index("ai_memory_user_key_idx").on(t.userId, t.key),
 }));
 
-// ─── Chat History ─────────────────────────────────────────────────────────────
 export const chatHistory = sqliteTable("chat_history", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -101,5 +110,12 @@ export const chatHistory = sqliteTable("chat_history", {
   userIdx: index("chat_history_user_idx").on(t.userId),
 }));
 
+export type User = typeof users.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type Category = typeof categories.$inferSelect;
+export type Transaction = typeof transactions.$inferSelect;
+export type AnomalyFeedback = typeof anomalyFeedback.$inferSelect;
+export type Budget = typeof budgets.$inferSelect;
+export type Decision = typeof decisions.$inferSelect;
 export type AiMemory = typeof aiMemory.$inferSelect;
 export type ChatHistory = typeof chatHistory.$inferSelect;

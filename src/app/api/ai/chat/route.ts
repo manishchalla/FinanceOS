@@ -3,11 +3,22 @@ import { auth } from "@/auth";
 import { db, transactions, accounts, budgets, categories, users } from "@/db";
 import { eq, sql } from "drizzle-orm";
 import { groq, GROQ_MODEL } from "@/lib/groq";
-import { classifyIntent } from "@/lib/chat-router";
 import { anonymizeForLLM } from "@/lib/privacy";
-import { getCashRunway } from "@/lib/insights";
+import { computeConfidence, confidenceLabel } from "@/lib/confidence";
 import { z } from "zod";
-import { format } from "date-fns";
+
+// Keywords that suggest the user wants individual transaction details
+const DETAIL_KEYWORDS = [
+  "which", "what transaction", "list", "show me", "breakdown", "individual",
+  "specific", "each", "all transactions", "every", "itemize",
+];
+
+function needsDetailedTx(messages: { role: string; content: string }[]): boolean {
+  const lastUser = [...messages].reverse().find(m => m.role === "user");
+  if (!lastUser) return false;
+  const q = lastUser.content.toLowerCase();
+  return DETAIL_KEYWORDS.some(k => q.includes(k));
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -15,11 +26,11 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id!;
 
   const { messages } = z.object({
-    messages: z.array(z.object({ role: z.enum(["user","assistant"]), content: z.string() }))
+    messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() }))
   }).parse(await req.json());
 
-  const lastUserMessage = [...messages].reverse().find(m => m.role === "user")?.content ?? "";
-  const intent = classifyIntent(lastUserMessage);
+  // Only send last 6 messages to LLM — not the full history
+  const recentMessages = messages.slice(-6);
 
   const [userAccounts, privacyRow, allTx, budgetList] = await Promise.all([
     db.select().from(accounts).where(eq(accounts.userId, userId)),
@@ -30,7 +41,8 @@ export async function POST(req: NextRequest) {
       amount: transactions.amount,
       type: transactions.type,
       date: transactions.date,
-    }).from(transactions)
+    })
+      .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(eq(transactions.userId, userId))
       .orderBy(sql`${transactions.date} ASC`),
@@ -38,191 +50,170 @@ export async function POST(req: NextRequest) {
   ]);
 
   const privacyMode = Boolean(privacyRow?.[0]?.privacyMode);
-
-  // Do ALL calculations in code — never let LLM calculate numbers.
-  const totalBalance = userAccounts.reduce((a, b) => a + b.balance, 0);
-
-  type MonthData = {
-    income: number; expense: number;
-    incomeItems: string[]; expenseItems: string[];
-  };
-  const totalIncome  = allTx.filter(t => t.type === "income").reduce((a, t) => a + t.amount, 0);
-  const totalExpense = allTx.filter(t => t.type === "expense").reduce((a, t) => a + t.amount, 0);
-
   const llmTxs = privacyMode ? anonymizeForLLM(allTx) : allTx;
 
+  const daysOfHistory = llmTxs.length > 0
+    ? Math.floor(
+        (new Date(llmTxs[llmTxs.length - 1]!.date).getTime() - new Date(llmTxs[0]!.date).getTime())
+        / (1000 * 60 * 60 * 24)
+      )
+    : 0;
+  const confidence = computeConfidence(llmTxs.length, daysOfHistory);
+  const totalBalance = userAccounts.reduce((a, b) => a + b.balance, 0);
+
+  // ── Monthly rollups ──────────────────────────────────────────
+  type MonthData = {
+    income: number;
+    expense: number;
+    txs: { desc: string; cat: string; amount: number; type: string; date: string }[];
+  };
   const monthly: Record<string, MonthData> = {};
+
   for (const tx of llmTxs) {
-    const month = tx.date.slice(0, 7); // YYYY-MM
-    if (!monthly[month]) monthly[month] = { income: 0, expense: 0, incomeItems: [], expenseItems: [] };
-    if (tx.type === "income") {
-      monthly[month].income += tx.amount;
-      monthly[month].incomeItems.push(`$${tx.amount} "${tx.description}" on ${tx.date}`);
-    } else if (tx.type === "expense") {
-      monthly[month].expense += tx.amount;
-      monthly[month].expenseItems.push(`$${tx.amount} "${tx.description}" on ${tx.date}`);
-    }
-  }
-
-  const monthKeysSorted = Object.keys(monthly).sort();
-  const latestMonthKey = monthKeysSorted[monthKeysSorted.length - 1] ?? "";
-  const prevMonthKey = monthKeysSorted.length >= 2 ? monthKeysSorted[monthKeysSorted.length - 2] : latestMonthKey;
-
-  function monthLabelFromKey(key: string): string {
-    if (!key) return "";
-    const y = parseInt(key.slice(0, 4), 10);
-    const m = parseInt(key.slice(5, 7), 10);
-    return format(new Date(y, m - 1, 1), "MMMM yyyy");
-  }
-
-  const monthlyTable = Object.entries(monthly)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([m, d]) => {
-      const net = d.income - d.expense;
-      return `${m}: income=$${d.income.toFixed(2)} | expenses=$${d.expense.toFixed(2)} | net=$${net.toFixed(2)}`;
-    }).join("\n");
-
-  const descTotals: Record<string, number> = {};
-  for (const tx of llmTxs) {
-    if (tx.type === "expense") {
-      descTotals[tx.description] = (descTotals[tx.description] ?? 0) + tx.amount;
-    }
-  }
-  const topExpenses = Object.entries(descTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([d, t]) => `"${d}": $${t.toFixed(2)} total`)
-    .join("\n");
-
-  const detailedMonths = Object.entries(monthly)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([m, d]) => {
-      return `\n${m} (income=$${d.income.toFixed(2)}, expenses=$${d.expense.toFixed(2)}, net=$${(d.income - d.expense).toFixed(2)}):\n  INCOME: ${d.incomeItems.join(" | ") || "none"}\n  EXPENSES: ${d.expenseItems.slice(0, 15).join(" | ") || "none"}`;
-    }).join("\n");
-
-  const systemPrompt = `You are a personal finance assistant. ALL numbers below are pre-calculated — do NOT recalculate, just look them up and quote them directly.
-
-ACCOUNTS: ${userAccounts.map(a => `${a.name}=$${a.balance.toFixed(2)}`).join(", ")}
-TOTAL BALANCE: $${totalBalance.toFixed(2)}
-TOTAL INCOME ALL TIME: $${totalIncome.toFixed(2)}
-TOTAL EXPENSES ALL TIME: $${totalExpense.toFixed(2)}
-NET SAVINGS ALL TIME: $${(totalIncome - totalExpense).toFixed(2)}
-ACTIVE BUDGETS: ${budgetList.length}
-
-MONTHLY SUMMARY TABLE (use this for month-specific questions):
-${monthlyTable}
-
-TOP EXPENSES ALL TIME:
-${topExpenses}
-
-DETAILED MONTHLY TRANSACTIONS (use this when asked about specific transactions in a month):
-${detailedMonths}
-
-RULES:
-- All numbers above are exact and pre-calculated. Quote them directly, do not add or subtract yourself.
-- When asked about a month, find that month in the MONTHLY SUMMARY TABLE and quote the exact income/expense/net figures.
-- When asked to list transactions, use the DETAILED MONTHLY TRANSACTIONS section.
-- Be concise — 2 to 4 sentences max.
-- Never say data is unavailable if it exists above.`;
-
-  const q = lastUserMessage.toLowerCase();
-
-  if (intent !== "ambiguous") {
-    const avgExpense =
-      monthKeysSorted.length > 0
-        ? monthKeysSorted.reduce((a, k) => a + (monthly[k]?.expense ?? 0), 0) / monthKeysSorted.length
-        : 0;
-
-    if (intent === "data") {
-      if (q.includes("total balance") || (q.includes("balance") && q.includes("total"))) {
-        return NextResponse.json({
-          reply: `Your total balance across all accounts is $${totalBalance.toFixed(2)}.`,
-          source: "calculated",
-          query: "accounts: sum(balance)",
-        });
-      }
-
-      if (q.includes("net savings")) {
-        const net = totalIncome - totalExpense;
-        return NextResponse.json({
-          reply: `Net savings are $${net.toFixed(2)}.`,
-          source: "calculated",
-          query: "transactions: sum(income) - sum(expense)",
-        });
-      }
-
-      if (q.includes("income")) {
-        const monthKey = q.includes("last month") ? prevMonthKey : latestMonthKey;
-        const income = monthKey ? monthly[monthKey]?.income ?? 0 : 0;
-        return NextResponse.json({
-          reply: `Income in ${monthLabelFromKey(monthKey)} is $${income.toFixed(2)}.`,
-          source: "calculated",
-          query: "transactions: monthly income totals",
-        });
-      }
-
-      if (q.includes("expenses") || q.includes("spending")) {
-        const monthKey = q.includes("last month") ? prevMonthKey : latestMonthKey;
-        const expense = monthKey ? monthly[monthKey]?.expense ?? 0 : 0;
-        return NextResponse.json({
-          reply: `Expenses in ${monthLabelFromKey(monthKey)} are $${expense.toFixed(2)}.`,
-          source: "calculated",
-          query: "transactions: monthly expense totals",
-        });
-      }
-
-      if (q.includes("transactions") || q.includes("history")) {
-        const totalCount = allTx.length;
-        const expenseCount = allTx.filter(t => t.type === "expense").length;
-        return NextResponse.json({
-          reply: `You have ${totalCount} transactions in your history, including ${expenseCount} expenses.`,
-          source: "calculated",
-          query: "transactions: count(*)",
-        });
-      }
-
-      return NextResponse.json({
-        reply: `I can calculate totals and month-specific income/expenses. Try: "income in last month" or "average expenses".`,
-        source: "calculated",
-        query: "transactions: rule-based lookup",
-      });
-    }
-
-    // planning
-    const subMatch = lastUserMessage.match(/\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*month|per\s*month|monthly)\b/i);
-    const hasAfford = q.includes("afford") || q.includes("subscription") || q.includes("can i afford");
-    if (hasAfford && subMatch) {
-      const subscriptionCost = parseFloat(subMatch[1] ?? "0");
-      const adjustedAvgExpense = avgExpense + subscriptionCost;
-      const runway = getCashRunway(adjustedAvgExpense, totalBalance);
-
-      return NextResponse.json({
-        reply: `With a ${subscriptionCost.toFixed(2)}/month subscription, your cash runway is about ${Number.isFinite(runway.monthsRemaining) ? runway.monthsRemaining.toFixed(1) : "∞"} months. (${runway.insight})`,
-        source: "rule-based",
-        query: "cash runway = totalBalance / (avgExpense + subscriptionCost)",
-      });
-    }
-
-    return NextResponse.json({
-      reply: `I can forecast if you share the monthly amount (e.g., "Can I afford a $50/month subscription?").`,
-      source: "rule-based",
-      query: "planning: missing subscription/monthly amount",
+    const month = tx.date.slice(0, 7);
+    if (!monthly[month]) monthly[month] = { income: 0, expense: 0, txs: [] };
+    if (tx.type === "income")  monthly[month].income  += tx.amount;
+    if (tx.type === "expense") monthly[month].expense += tx.amount;
+    monthly[month].txs.push({
+      desc: tx.description,
+      cat: tx.categoryName ?? "Uncategorized",
+      amount: tx.amount,
+      type: tx.type,
+      date: tx.date,
     });
   }
 
-  // ambiguous => LLM
+  const monthKeysSorted = Object.keys(monthly).sort();
+
+  // ── Category totals (all time) ───────────────────────────────
+  const categoryTotals: Record<string, number> = {};
+  for (const tx of llmTxs) {
+    if (tx.type === "expense") {
+      const cat = tx.categoryName ?? "Uncategorized";
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + tx.amount;
+    }
+  }
+
+  // ── Category totals per month ────────────────────────────────
+  const monthlyCatTotals: Record<string, Record<string, number>> = {};
+  for (const tx of llmTxs) {
+    if (tx.type === "expense") {
+      const month = tx.date.slice(0, 7);
+      const cat = tx.categoryName ?? "Uncategorized";
+      if (!monthlyCatTotals[month]) monthlyCatTotals[month] = {};
+      monthlyCatTotals[month]![cat] = (monthlyCatTotals[month]![cat] ?? 0) + tx.amount;
+    }
+  }
+
+  // ── Totals ───────────────────────────────────────────────────
+  const totalIncome  = llmTxs.filter(t => t.type === "income").reduce((a, t)  => a + t.amount, 0);
+  const totalExpense = llmTxs.filter(t => t.type === "expense").reduce((a, t) => a + t.amount, 0);
+
+  // ── Build compact prompt sections ───────────────────────────
+  const accountsSection = userAccounts
+    .map(a => `  ${a.name} (${a.type}): $${a.balance.toFixed(2)}`)
+    .join("\n");
+
+  const monthlyTable = monthKeysSorted
+    .map(m => {
+      const d = monthly[m]!;
+      return `${m}: income=$${d.income.toFixed(2)} expenses=$${d.expense.toFixed(2)} net=$${(d.income - d.expense).toFixed(2)}`;
+    })
+    .join("\n");
+
+  const categoryTable = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, total]) => `  ${cat}: $${total.toFixed(2)}`)
+    .join("\n");
+
+  const monthlyCategoryTable = monthKeysSorted
+    .map(m => {
+      const cats = monthlyCatTotals[m];
+      if (!cats || Object.keys(cats).length === 0) return null;
+      const lines = Object.entries(cats)
+        .sort((a, b) => b[1] - a[1])
+        .map(([cat, total]) => `    ${cat}: $${total.toFixed(2)}`)
+        .join("\n");
+      return `  ${m}:\n${lines}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  // ── Conditionally include per-transaction detail ─────────────
+  // Only injected when the user's question needs it — keeps token usage low
+  let detailSection = "";
+  if (needsDetailedTx(recentMessages)) {
+    // Find which month(s) the user is asking about
+    const lastMsg = [...recentMessages].reverse().find(m => m.role === "user")?.content.toLowerCase() ?? "";
+    const relevantMonths = monthKeysSorted.filter(m => {
+      const [year, mo] = m.split("-");
+      const monthName = new Date(`${m}-01`).toLocaleString("en-US", { month: "long" }).toLowerCase();
+      const shortName = new Date(`${m}-01`).toLocaleString("en-US", { month: "short" }).toLowerCase();
+      return lastMsg.includes(m) || lastMsg.includes(monthName) || lastMsg.includes(shortName) || lastMsg.includes(year!);
+    });
+
+    // Default to last 2 months if no specific month detected
+    const targetMonths = relevantMonths.length > 0
+      ? relevantMonths
+      : monthKeysSorted.slice(-2);
+
+    detailSection = "\n\nDETAILED TRANSACTIONS (for the relevant period only):\n" +
+      targetMonths.map(m => {
+        const d = monthly[m]!;
+        // Cap at 15 transactions per month to stay within token limits
+        const lines = d.txs
+          .slice(0, 15)
+          .map(t => `    ${t.date} | ${t.type === "income" ? "+" : "-"}$${t.amount.toFixed(2)} | ${t.desc} [${t.cat}]`)
+          .join("\n");
+        const truncated = d.txs.length > 15 ? `\n    ...and ${d.txs.length - 15} more` : "";
+        return `  ${m} (${d.txs.length} transactions):\n${lines}${truncated}`;
+      }).join("\n");
+  }
+
+  const systemPrompt = `You are a personal finance assistant with direct access to the user's complete transaction history. Answer using ONLY the data below — do not guess or fabricate numbers.
+
+DATA QUALITY: ${confidence.level} — ${confidenceLabel(confidence.level)} (${confidence.reason})
+
+ACCOUNTS:
+${accountsSection}
+Total balance: $${totalBalance.toFixed(2)}
+
+ALL-TIME TOTALS (${llmTxs.length} transactions, ${monthKeysSorted[0] ?? "n/a"} to ${monthKeysSorted[monthKeysSorted.length - 1] ?? "n/a"}):
+  Total income: $${totalIncome.toFixed(2)}
+  Total expenses: $${totalExpense.toFixed(2)}
+  Net savings: $${(totalIncome - totalExpense).toFixed(2)}
+  Active budgets: ${budgetList.length}
+
+MONTHLY SUMMARY:
+${monthlyTable}
+
+EXPENSE TOTALS BY CATEGORY (all time):
+${categoryTable}
+
+EXPENSE BY CATEGORY PER MONTH:
+${monthlyCategoryTable}${detailSection}
+
+RULES:
+1. For a specific month, use the MONTHLY SUMMARY table (YYYY-MM format).
+2. For category questions, use EXPENSE TOTALS BY CATEGORY.
+3. For month + category, use EXPENSE BY CATEGORY PER MONTH.
+4. Never say $0 unless the data genuinely shows $0.
+5. Quote exact figures. Do not round or estimate.
+6. Be concise: 1–3 sentences. State the number, then one useful observation.
+7. If data for a requested period doesn't exist, say so clearly.`;
+
   const completion = await groq.chat.completions.create({
     model: GROQ_MODEL,
     max_tokens: 500,
     messages: [
       { role: "system", content: systemPrompt },
-      ...messages,
+      ...recentMessages,
     ],
   });
 
   return NextResponse.json({
     reply: completion.choices[0]?.message?.content ?? "Could not generate a response.",
-    source: "ai-estimate",
-    query: "transactions+budgets: precomputed context for LLM",
+    source: "ai",
+    confidence: confidence.level,
   });
 }

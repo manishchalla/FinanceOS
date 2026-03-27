@@ -8,6 +8,7 @@ import { z } from "zod";
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
+import { BulkActionBar } from "@/components/bulk-action-bar";
 
 type Tx = {
   id: string; description: string; amount: number; type: string;
@@ -410,6 +411,25 @@ export default function TransactionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showCSV, setShowCSV] = useState(false);
   const [editingTx, setEditingTx] = useState<Tx | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filtered.map((t: Tx) => t.id)));
+  }
+
+  const bulkMutation = useMutation({
+    mutationFn: (payload: { ids: string[]; action: string; categoryId?: string | null }) =>
+      fetch("/api/transactions/bulk", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then(r => r.json()),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["transactions"] }); qc.invalidateQueries({ queryKey: ["accounts"] }); setSelectedIds(new Set()); },
+  });
 
   const isCustom = datePreset === DATE_PRESETS.length - 1;
   const fromDate = isCustom ? customFrom : DATE_PRESETS[datePreset].from();

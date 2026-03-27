@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const hashed = await bcrypt.hash(body.password, 12);
     const [user] = await db.insert(users).values({ name: body.name, email: body.email, password: hashed }).returning({ id: users.id });
     await seedCategories(user.id);
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, onboarding: true }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.errors }, { status: 400 });
     return NextResponse.json({ error: "Server error" }, { status: 500 });

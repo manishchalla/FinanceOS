@@ -1,7 +1,8 @@
-
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Brain, MessageSquare, AlertTriangle, Zap, Send, Loader2, TrendingUp, RefreshCw } from "lucide-react";
+import { ConfidenceBadge } from "@/components/confidence-badge";
+import type { ConfidenceLevel } from "@/lib/confidence";
 
 type HealthScore = {
   score: number; grade: string; summary: string;
@@ -9,18 +10,14 @@ type HealthScore = {
   topInsights: string[]; actionItems: string[];
 };
 type Anomaly = {
-  type: string;
-  severity: "high" | "medium" | "low";
-  title: string;
-  description: string;
-  amount: number | null;
-  category: string | null;
-  reason?: string;
-  transaction_id?: string;
+  type: string; severity: "high" | "medium" | "low";
+  title: string; description: string;
+  amount: number | null; category: string | null;
+  reason?: string; transaction_id?: string;
 };
 type AnomalyResult = { anomalies: Anomaly[]; summary: string };
-type ChatSource = "calculated" | "ai-estimate" | "rule-based";
-type ChatMessage = { role: "user"|"assistant"; content: string; source?: ChatSource; query?: string };
+type ChatSource = "ai" | "calculated" | "ai-estimate" | "rule-based";
+type ChatMessage = { role: "user"|"assistant"; content: string; source?: ChatSource; query?: string; confidence?: ConfidenceLevel };
 
 function ScoreRing({ score, grade }: { score: number; grade: string }) {
   const r = 54, circ = 2 * Math.PI * r;
@@ -124,15 +121,13 @@ export default function AIPage() {
         body: JSON.stringify({ messages: updated }),
       });
       const json = await res.json();
-      setMessages(m => [
-        ...m,
-        {
-          role: "assistant",
-          content: json.reply ?? "Sorry, try again.",
-          source: json.source as ChatSource | undefined,
-          query: typeof json.query === "string" ? json.query : undefined,
-        },
-      ]);
+      setMessages(m => [...m, {
+        role: "assistant",
+        content: json.reply ?? "Sorry, try again.",
+        source: json.source as ChatSource | undefined,
+        query: typeof json.query === "string" ? json.query : undefined,
+        confidence: json.confidence as ConfidenceLevel | undefined,
+      }]);
     } catch {
       setMessages(m => [...m, { role: "assistant", content: "Network error. Please try again." }]);
     } finally { setChatLoading(false); }
@@ -209,7 +204,7 @@ export default function AIPage() {
                   <h3 className="text-white font-semibold mb-3 flex items-center gap-2"><Zap className="h-4 w-4 text-amber-400" />Action Items</h3>
                   <div className="space-y-2">
                     {healthData.actionItems.map((act, i) => (
-                      <div key={i} className="flex gap-2 text-sm"><span className="text-amber-400 font-bold shrink-0">{i + 1}.</span><span className="text-slate-300">{act}</span></div>
+                      <div key={i} className="flex gap-2 text-sm"><span className="text-amber-400 font-bold shrink-0">{i+1}.</span><span className="text-slate-300">{act}</span></div>
                     ))}
                   </div>
                 </div>
@@ -231,45 +226,37 @@ export default function AIPage() {
                 </div>
               </div>
               {messages.length > 0 && (
-                <button
-                  onClick={() => setMessages([])}
-                  className="text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10 border border-slate-700 px-3 py-1.5 rounded-lg"
-                >
-                  Clear
-                </button>
+                <button onClick={() => setMessages([])} className="text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10 border border-slate-700 px-3 py-1.5 rounded-lg">Clear</button>
               )}
             </div>
 
             <div className="mt-4 bg-slate-950/40 border border-slate-800 rounded-xl p-3">
               {messages.length === 0 ? (
                 <div className="py-10 text-center">
-                  <p className="text-slate-400 text-sm">Ask about totals, averages, or “can I afford $X/month”</p>
-                  <p className="text-slate-600 text-xs mt-2">Examples: “income last month”, “average expenses”, “can I afford a $50/month subscription?”</p>
+                  <p className="text-slate-400 text-sm">Ask about totals, averages, or "can I afford $X/month"</p>
+                  <div className="flex flex-wrap gap-2 justify-center mt-4">
+                    {SUGGESTED.map(s => (
+                      <button key={s} onClick={() => sendChat(s)} className="text-xs px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:border-purple-500/50 transition-all">{s}</button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="max-h-[420px] overflow-y-auto pr-1 space-y-3">
                   {messages.map((m, i) => (
                     <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                        m.role === "user"
-                          ? "bg-purple-500 text-white rounded-tr-sm"
-                          : "bg-slate-800 text-white rounded-tl-sm border border-slate-700"
-                      }`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "bg-purple-500 text-white rounded-tr-sm" : "bg-slate-800 text-white rounded-tl-sm border border-slate-700"}`}>
                         {m.content}
                       </div>
-
-                      {m.role === "assistant" && m.source && (
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          Source: <span className="text-purple-300">{m.source}</span>
+                      {m.role === "assistant" && (m.source || m.confidence) && (
+                        <div className="flex items-center gap-2 mt-1">
+                          {m.source && <span className="text-[11px] text-slate-400">Source: <span className="text-purple-300">{m.source}</span></span>}
+                          {m.confidence && <ConfidenceBadge level={m.confidence} />}
                         </div>
                       )}
-
                       {m.role === "assistant" && m.query && (
-                        <details className="text-[11px] text-slate-500 mt-2">
+                        <details className="text-[11px] text-slate-500 mt-1">
                           <summary className="cursor-pointer hover:text-purple-300 transition-colors">View query</summary>
-                          <pre className="mt-2 whitespace-pre-wrap p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-slate-300">
-                            {m.query}
-                          </pre>
+                          <pre className="mt-2 whitespace-pre-wrap p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-slate-300">{m.query}</pre>
                         </details>
                       )}
                     </div>
@@ -280,18 +267,12 @@ export default function AIPage() {
             </div>
 
             <div className="mt-4 flex gap-2 items-start">
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
+              <input value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(input); } }}
                 placeholder="Ask a question or give a command..."
-                className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-              />
-              <button
-                onClick={() => sendChat(input)}
-                disabled={!input.trim() || chatLoading}
-                className="px-4 py-2.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl transition-all font-semibold text-sm"
-              >
+                className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition-colors" />
+              <button onClick={() => sendChat(input)} disabled={!input.trim() || chatLoading}
+                className="px-4 py-2.5 bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl transition-all font-semibold text-sm">
                 {chatLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : <Send className="h-4 w-4 mx-auto" />}
               </button>
             </div>
@@ -305,7 +286,7 @@ export default function AIPage() {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 text-center">
               <AlertTriangle className="h-12 w-12 text-amber-400/40 mx-auto mb-4" />
               <h3 className="text-white font-semibold text-lg mb-2">Anomaly Radar</h3>
-              <p className="text-slate-400 text-sm mb-6 max-w-sm mx-auto">AI compares your recent spending against your historical averages to flag unusual charges and suspicious patterns.</p>
+              <p className="text-slate-400 text-sm mb-6 max-w-sm mx-auto">Compares recent spending against historical averages. Flags duplicate charges, spending spikes, and large one-offs. Thresholds auto-tune from your feedback.</p>
               <button onClick={loadAnomalies} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-all">Scan My Transactions</button>
             </div>
           )}
@@ -339,11 +320,10 @@ export default function AIPage() {
                       </div>
                       <p className="font-semibold text-sm">{a.title}</p>
                       <p className="text-xs mt-1 opacity-80">{a.description}</p>
-                      {a.reason && <p className="text-xs mt-2 text-slate-400 opacity-95">{a.reason}</p>}
+                      {a.reason && <p className="text-xs mt-2 text-slate-400 opacity-95 font-medium">Why: {a.reason}</p>}
                     </div>
                     {a.amount != null && <p className="text-sm font-bold shrink-0">${a.amount.toFixed(2)}</p>}
                   </div>
-
                   <div className="mt-3 flex gap-2">
                     <button
                       disabled={!a.transaction_id || anomalyFeedback[`${a.type}-${a.transaction_id}`] !== undefined}
@@ -351,32 +331,20 @@ export default function AIPage() {
                         if (!a.transaction_id) return;
                         const key = `${a.type}-${a.transaction_id}`;
                         setAnomalyFeedback(prev => ({ ...prev, [key]: "confirmed" }));
-                        await fetch("/api/anomaly-feedback", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ transaction_id: a.transaction_id, type: a.type, user_verdict: "confirmed" }),
-                        });
+                        await fetch("/api/anomaly-feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transaction_id: a.transaction_id, type: a.type, user_verdict: "confirmed" }) });
                       }}
                       className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 disabled:opacity-50"
-                    >
-                      Confirm
-                    </button>
+                    >{anomalyFeedback[`${a.type}-${a.transaction_id}`] === "confirmed" ? "✓ Confirmed" : "Confirm"}</button>
                     <button
                       disabled={!a.transaction_id || anomalyFeedback[`${a.type}-${a.transaction_id}`] !== undefined}
                       onClick={async () => {
                         if (!a.transaction_id) return;
                         const key = `${a.type}-${a.transaction_id}`;
                         setAnomalyFeedback(prev => ({ ...prev, [key]: "false_alarm" }));
-                        await fetch("/api/anomaly-feedback", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ transaction_id: a.transaction_id, type: a.type, user_verdict: "false_alarm" }),
-                        });
+                        await fetch("/api/anomaly-feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transaction_id: a.transaction_id, type: a.type, user_verdict: "false_alarm" }) });
                       }}
                       className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 disabled:opacity-50"
-                    >
-                      False alarm
-                    </button>
+                    >{anomalyFeedback[`${a.type}-${a.transaction_id}`] === "false_alarm" ? "✓ Noted" : "False alarm"}</button>
                   </div>
                 </div>
               ))}

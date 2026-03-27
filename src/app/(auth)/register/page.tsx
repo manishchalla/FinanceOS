@@ -28,7 +28,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: data.name, email: data.email, password: data.password }) });
     const json = await res.json();
     if (!res.ok) setError(json.error ?? "Registration failed");
-    else router.push("/login");
+    else router.push("/onboarding");
   }
 
   return (

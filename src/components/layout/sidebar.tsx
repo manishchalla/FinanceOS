@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ArrowLeftRight, Wallet, PieChart, Tag, TrendingUp, LogOut, Sparkles, Settings } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Wallet, PieChart, Tag, TrendingUp, LogOut, Sparkles, Settings, Target } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import type { User } from "next-auth";
